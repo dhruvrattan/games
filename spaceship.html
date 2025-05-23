@@ -658,8 +658,8 @@
 
 
             // --- Update UI elements not on canvas ---
-            updateWeaponStatus(timestamp);
-            updateHyperspaceStatus(timestamp);
+            updateWeaponStatus(); // No more timestamp
+            updateHyperspaceStatus(); // No more timestamp
 
 
             // --- Request Next Frame ---
@@ -798,12 +798,29 @@
              }
          }
 
-        function updateHyperspaceStatus(timestamp = Date.now()) {
-             const timeSinceLastJump = timestamp - lastHyperspaceTime;
+        function updateHyperspaceStatus() { // Removed timestamp parameter
+             const now = Date.now(); // Get current time using Date.now()
+             const timeSinceLastJump = now - lastHyperspaceTime;
 
-            if (!hyperspaceReady && timeSinceLastJump >= HYPERSPACE_COOLDOWN) {
+            // Logic for determining if hyperspace is ready based on cooldown (if it was used recently)
+            // This needs to be done carefully. If currentHyperspaceCharges is 0, it might still be "cooling down"
+            // from a visual perspective if the last jump was recent, even if it can't be used.
+            // However, `hyperspaceReady` is more about usability for the *next* jump if charges are available.
+            if (!hyperspaceReady && currentHyperspaceCharges > 0 && timeSinceLastJump >= HYPERSPACE_COOLDOWN) {
+                 hyperspaceReady = true;
+            }
+            // If it was cooling down but charges ran out, it's no longer "ready" in a usable sense.
+            // Or if charges are positive, but it was used and is now cooled down.
+            // The original logic: `if (!hyperspaceReady && timeSinceLastJump >= HYPERSPACE_COOLDOWN)` seems to correctly
+            // transition `hyperspaceReady` to true if it was false and cooldown has passed.
+            // This should be okay if `lastHyperspaceTime` is always set when a jump occurs.
+
+            // Let's stick to the original logic for `hyperspaceReady` state update for now,
+            // as it might be intertwined with charge management. The key is `timeSinceLastJump`.
+             if (!hyperspaceReady && timeSinceLastJump >= HYPERSPACE_COOLDOWN) {
                  hyperspaceReady = true;
              }
+
 
              let statusText = "Hyperspace (H): ";
              let barPercentage = 0;
@@ -812,25 +829,27 @@
                  if (hyperspaceReady) {
                      statusText += "Ready ";
                      barPercentage = 100;
-                 } else {
+                 } else { // Still cooling down from a previous jump (and has charges)
                      statusText += "Charging ";
                      barPercentage = Math.min(100, (timeSinceLastJump / HYPERSPACE_COOLDOWN) * 100);
                  }
-             } else {
-                 if (timeSinceLastJump < HYPERSPACE_COOLDOWN) {
-                     statusText += "Charging ";
+             } else { // 0 charges left
+                 // If it was cooling down from the jump that consumed the last charge:
+                 if (!hyperspaceReady && timeSinceLastJump < HYPERSPACE_COOLDOWN) {
+                     statusText += "Charging "; // Visually show cooldown of last jump
                       barPercentage = Math.min(100, (timeSinceLastJump / HYPERSPACE_COOLDOWN) * 100);
                  } else {
+                     // Cooldown finished (or was never cooling if jumps happened long ago) and no charges.
                      statusText += "Depleted ";
-                      barPercentage = 0; // Should recharge eventually if charges were > 0, but handles 0 charge case
+                      barPercentage = 0;
                  }
              }
 
-
              hyperspaceStatusElement.textContent = statusText;
-             hyperspaceChargesElement.textContent = `(${'⚡'.repeat(currentHyperspaceCharges)}${'-'.repeat(HYPERSPACE_CHARGES - currentHyperspaceCharges)})`; // Visual charge indicator
+             hyperspaceChargesElement.textContent = `(${'⚡'.repeat(currentHyperspaceCharges)}${'-'.repeat(HYPERSPACE_CHARGES - currentHyperspaceCharges)})`;
              hyperspaceBarElement.style.width = `${barPercentage}%`;
-             hyperspaceBarElement.style.backgroundColor = hyperspaceReady && currentHyperspaceCharges > 0 ? '#0af' : '#aa0'; // Cyan when ready, Yellow when charging/depleted
+             // Ensure background color reflects true readiness (charges > 0 AND cooled down)
+             hyperspaceBarElement.style.backgroundColor = hyperspaceReady && currentHyperspaceCharges > 0 ? '#0af' : '#aa0';
         }
 
         // --- Game State Management ---
