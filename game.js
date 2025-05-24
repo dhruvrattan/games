@@ -448,8 +448,8 @@
             }
             ctx.closePath();
 
-            ctx.fillStyle = this.isFragment ? '#a0a0a0' : '#8b4513'; // Lighter grey for fragments, brown for asteroids
-            ctx.strokeStyle = this.isFragment ? '#cccccc' : '#a0522d'; // Lighter outlines
+            ctx.fillStyle = '#a0a0a0';
+            ctx.strokeStyle = '#cccccc';
             ctx.lineWidth = 1.5;
             ctx.fill();
             ctx.stroke();
