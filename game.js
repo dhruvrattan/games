@@ -34,7 +34,12 @@
         FRAGMENT_SIZE_DIVISOR: 2.5,
         HYPERSPACE_CHARGES: 3,
         HYPERSPACE_COOLDOWN: 5000, // 5 seconds
-        HYPERSPACE_MALFUNCTION_CHANCE: 0.15 // 15% chance
+        HYPERSPACE_MALFUNCTION_CHANCE: 0.15, // 15% chance
+        SHIELD_POWERUP_MIN_SPAWN_INTERVAL: 15000, // 15 seconds
+        SHIELD_POWERUP_MAX_SPAWN_INTERVAL: 30000, // 30 seconds
+        SHIELD_POWERUP_SPEED: 2,
+        SHIELD_POWERUP_SIZE: 15, // radius
+        SHIELD_DURATION: 20000, // 20 seconds in milliseconds
     };
 
     let canvasWidth, canvasHeight;
@@ -56,6 +61,9 @@
     let lastHyperspaceTime = 0;
     let currentHyperspaceCharges = GAME_CONFIG.HYPERSPACE_CHARGES;
     let hyperspaceReady = true;
+    let shieldPowerUps = [];
+    let lastShieldPowerUpSpawnTime = 0;
+    // Temporary global flag REMOVED
 
     // --- Utility Functions ---
     function random(min, max) {
@@ -100,6 +108,37 @@
         }
     }
 
+    // NEW CLASS HERE
+    class ShieldPowerUp {
+        constructor(x, y, size, speed) { // Note: x, y might be determined at spawn time, not passed directly if always random top
+            this.x = x !== undefined ? x : random(0, canvasWidth); // If x is passed, use it, otherwise random
+            this.y = y !== undefined ? y : -15; // Start off-screen top, assuming size is radius 15
+            this.size = size !== undefined ? size : 15; // Default radius 15px
+            this.speed = speed !== undefined ? speed : 2; // Default speed 2
+            this.collisionRadius = this.size;
+            // Color for the shield power-up
+            this.color = 'aqua'; // A bright blue color
+        }
+
+        draw() {
+            ctx.save();
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Optional: Add a border or an inner glow for better visibility
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        update() {
+            this.y += this.speed;
+        }
+    }
+
     class Spaceship {
         constructor(x, y) {
             this.x = x;
@@ -114,6 +153,10 @@
             this.invincible = false;
             this.invincibleTimer = 0;
             this.invincibleDuration = 1500; // 1.5 seconds invincibility after hit
+
+            // New shield properties
+            this.shieldActive = false;
+            this.shieldTimer = 0;
         }
 
         update(deltaTime) {
@@ -167,6 +210,16 @@
                 this.invincibleTimer -= deltaTime;
                 if (this.invincibleTimer <= 0) {
                     this.invincible = false;
+                }
+            }
+
+            // Shield timer countdown
+            if (this.shieldActive) {
+                this.shieldTimer -= deltaTime;
+                if (this.shieldTimer <= 0) {
+                    this.shieldActive = false;
+                    this.shieldTimer = 0; // Reset timer
+                    // console.log("Shield deactivated"); // For debugging
                 }
             }
         }
@@ -230,6 +283,18 @@
                     ctx.fillStyle = `rgba(255, 255, ${100 + Math.random() * 100}, ${0.7 + this.propulsionLevel * 0.3})`;
                     ctx.fill();
                  }
+            }
+
+            // --- Draw Shield if Active (after other ship components) ---
+            if (this.shieldActive) {
+                const shieldRadius = this.height / 2 + 10; // Make it large enough to cover the ship
+                ctx.beginPath();
+                ctx.arc(0, 0, shieldRadius, 0, Math.PI * 2); // x=0, y=0 because we've translated context
+                ctx.fillStyle = 'rgba(0, 170, 255, 0.3)'; // Semi-transparent blue
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0, 200, 255, 0.7)'; // Brighter blue border
+                ctx.lineWidth = 2;
+                ctx.stroke();
             }
 
             ctx.restore();
@@ -429,6 +494,9 @@
         lastHyperspaceTime = 0;
         currentHyperspaceCharges = GAME_CONFIG.HYPERSPACE_CHARGES;
         hyperspaceReady = true;
+        shieldPowerUps = []; // Initialize
+        lastShieldPowerUpSpawnTime = 0; // Initialize
+        // shieldCurrentlyActive REMOVED
 
 
         ship = new Spaceship(canvasWidth / 2, canvasHeight - 80);
@@ -482,13 +550,20 @@
         asteroids.forEach(asteroid => asteroid.update());
         fragments.forEach(fragment => fragment.update());
 
+        // Shield Power-Ups Update
+        shieldPowerUps.forEach(powerUp => powerUp.update());
+
         // Remove off-screen asteroids/fragments (adjust boundaries as needed)
          asteroids = asteroids.filter(ast => ast.x > -ast.size && ast.x < canvasWidth + ast.size && ast.y < canvasHeight + ast.size && ast.y > -ast.size*3); // Give more leeway for top entry
          fragments = fragments.filter(frag => frag.x > -frag.size && frag.x < canvasWidth + frag.size && frag.y < canvasHeight + frag.size && frag.y > -frag.size);
+        
+        // Filter off-screen Shield Power-Ups
+        shieldPowerUps = shieldPowerUps.filter(p => p.y - p.size < canvasHeight);
 
 
         // --- Spawning ---
         spawnAsteroid();
+        spawnShieldPowerUp(); // Call the new spawn function
 
         // --- Handle Input ---
         handleInput(); // Process continuous movement
@@ -506,6 +581,9 @@
         // Asteroids & Fragments
         asteroids.forEach(asteroid => asteroid.draw());
         fragments.forEach(fragment => fragment.draw());
+
+        // Shield Power-Ups Draw
+        shieldPowerUps.forEach(powerUp => powerUp.draw());
 
         // Ship (draw last - foreground)
         ship.draw();
@@ -556,6 +634,25 @@
          }
     }
 
+    function spawnShieldPowerUp() {
+        const now = Date.now(); // Or use gameTime if more appropriate for consistency
+
+        // Use ship.shieldActive instead of the temporary variable
+        if (ship && ship.shieldActive) { // Check if ship exists and shield is active
+            return;
+        }
+
+        const randomInterval = random(GAME_CONFIG.SHIELD_POWERUP_MIN_SPAWN_INTERVAL, GAME_CONFIG.SHIELD_POWERUP_MAX_SPAWN_INTERVAL);
+
+        if (now - lastShieldPowerUpSpawnTime > randomInterval) {
+            const newPowerUpX = random(0, canvasWidth);
+            // Assuming ShieldPowerUp constructor handles default y, size, speed if not provided,
+            // or pass them explicitly using GAME_CONFIG values.
+            shieldPowerUps.push(new ShieldPowerUp(newPowerUpX, -GAME_CONFIG.SHIELD_POWERUP_SIZE, GAME_CONFIG.SHIELD_POWERUP_SIZE, GAME_CONFIG.SHIELD_POWERUP_SPEED));
+            lastShieldPowerUpSpawnTime = now;
+        }
+    }
+
     // --- Collision Detection ---
     function checkCollisions() {
         // Laser vs Asteroids/Fragments
@@ -593,29 +690,67 @@
         }
 
         // Ship vs Asteroids/Fragments
-        if (!ship.invincible) {
-            // Check vs Asteroids
+        // Check vs Asteroids
+        if (ship) { // Ensure ship exists before checking its properties
             for (let j = asteroids.length - 1; j >= 0; j--) {
                 const asteroid = asteroids[j];
-                 if (distance(ship.x, ship.y, asteroid.x, asteroid.y) < asteroid.radius + ship.collisionRadius) {
-                    ship.takeHit();
-                    destroyAsteroid(asteroid, j); // Destroy asteroid on collision too
-                    if(isGameOver) return; // Stop checking if game over triggered
-                    break; // Only process one collision per frame
+                if (distance(ship.x, ship.y, asteroid.x, asteroid.y) < asteroid.radius + ship.collisionRadius) {
+                    if (ship.shieldActive) {
+                        destroyAsteroid(asteroid, j); // Destroy asteroid, shield absorbs hit
+                        // console.log("Shield absorbed asteroid hit!"); // For debugging
+                        if (isGameOver) return; // destroyAsteroid might lead to score that could end game
+                        break; // Process one collision
+                    } else {
+                        // Shield is not active, proceed with normal damage mechanism
+                        if (!ship.invincible) {
+                            ship.takeHit();
+                            destroyAsteroid(asteroid, j); // Asteroid is destroyed even on normal hit
+                            if (isGameOver) return;
+                            break;
+                        }
+                    }
                 }
             }
-             // Check vs Fragments (only if no asteroid collision happened)
-             if (!ship.invincible) { // Check again as takeHit might grant invincibility
-                 for (let k = fragments.length - 1; k >= 0; k--) {
-                     const fragment = fragments[k];
-                     if (distance(ship.x, ship.y, fragment.x, fragment.y) < fragment.radius + ship.collisionRadius) {
-                         ship.takeHit();
-                         fragments.splice(k, 1); // Remove fragment on collision
-                         if(isGameOver) return;
-                         break;
-                     }
-                 }
-             }
+
+            // Check vs Fragments
+            // The shield or invincibility status could have changed from an asteroid collision,
+            // so we re-evaluate conditions.
+            for (let k = fragments.length - 1; k >= 0; k--) {
+                const fragment = fragments[k];
+                if (distance(ship.x, ship.y, fragment.x, fragment.y) < fragment.radius + ship.collisionRadius) {
+                    if (ship.shieldActive) {
+                        fragments.splice(k, 1); // Destroy fragment, shield absorbs hit
+                        // console.log("Shield absorbed fragment hit!"); // For debugging
+                        break; // Process one collision
+                    } else {
+                        // Shield is not active, proceed with normal damage mechanism
+                        if (!ship.invincible) { // This check is important
+                            ship.takeHit();
+                            fragments.splice(k, 1);
+                            if (isGameOver) return;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- Ship vs Shield Power-Ups ---
+        // Iterate backwards if modifying the array by splicing
+        if (ship) { // Ensure ship exists
+            for (let i = shieldPowerUps.length - 1; i >= 0; i--) {
+                const powerUp = shieldPowerUps[i];
+                if (distance(ship.x, ship.y, powerUp.x, powerUp.y) < ship.collisionRadius + powerUp.collisionRadius) {
+                    ship.shieldActive = true;
+                    ship.shieldTimer = GAME_CONFIG.SHIELD_DURATION;
+                    shieldPowerUps.splice(i, 1); // Remove the collected power-up
+
+                    // Optional: Add sound effect for power-up collection here
+                    // console.log("Shield Activated!"); // For debugging
+
+                    break; // Ship collects one power-up at a time
+                }
+            }
         }
     }
 
