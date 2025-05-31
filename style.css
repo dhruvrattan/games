@@ -1,111 +1,174 @@
+:root {
+    --primary-background-color: #000;
+    --primary-text-color: #fff;
+    --canvas-background-color: #080810;
+    --ui-element-background-color: rgba(50, 50, 50, 0.7);
+    --ui-element-border-color: #888;
+    --button-background-color: #44f;
+    --button-text-color: white;
+    --link-color: #0af; /* Example link color for dark mode */
+    --game-over-background-color: rgba(0, 0, 0, 0.8);
+    --game-over-border-color: #f00;
+    --game-over-text-color: #f00;
+    --weapon-bar-background-color: #0f0;
+    --hyperspace-bar-background-color: #0af; /* Cyan */
+    --bar-container-background-color: #555;
+    --text-shadow-color: #000; /* Shadow for dark mode */
+}
+
+body.light-mode {
+    --primary-background-color: #f0f0f0;
+    --primary-text-color: #333;
+    --canvas-background-color: #e0e0e8;
+    --ui-element-background-color: rgba(220, 220, 220, 0.8);
+    --ui-element-border-color: #bbb;
+    --button-background-color: #007bff;
+    --button-text-color: white;
+    --link-color: #0056b3; /* Example link color for light mode */
+    --game-over-background-color: rgba(255, 255, 255, 0.85);
+    --game-over-border-color: #dc3545;
+    --game-over-text-color: #dc3545;
+    --weapon-bar-background-color: #28a745;
+    --hyperspace-bar-background-color: #17a2b8; /* Cyan-like for light mode */
+    --bar-container-background-color: #ccc;
+    --text-shadow-color: rgba(0,0,0,0.2); /* Lighter shadow for light mode */
+}
+
 body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            font-family: 'Arial', sans-serif; /* Basic fallback font */
-            color: #fff;
-        }
-        canvas {
-            display: block;
-            background-color: #080810; /* Dark space blue/black */
-            border: 1px solid #333;
-        }
-        #ui-container {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 20px;
-            pointer-events: none; /* Don't interfere with canvas */
-            text-shadow: 1px 1px 2px #000;
-        }
-        #weapon-status {
-            position: absolute;
-            bottom: 15px;
-            left: 15px;
-            background: rgba(50, 50, 50, 0.7);
-            padding: 5px;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        #weapon-bar-container {
-            width: 100px;
-            height: 10px;
-            background-color: #555;
-            border: 1px solid #888;
-            border-radius: 3px;
-            margin-top: 3px;
-            overflow: hidden;
-        }
-        #weapon-bar {
-            width: 100%;
-            height: 100%;
-            background-color: #0f0;
-            transition: width 0.1s linear; /* Smooth recharge vis */
-        }
-        #hyperspace-status {
-            position: absolute;
-            bottom: 15px;
-            right: 15px;
-            background: rgba(50, 50, 50, 0.7);
-            padding: 5px;
-            border-radius: 5px;
-            font-size: 14px;
-            text-align: right;
-        }
-        #hyperspace-bar-container {
-             width: 100px;
-            height: 10px;
-            background-color: #555;
-            border: 1px solid #888;
-            border-radius: 3px;
-            margin-top: 3px;
-            overflow: hidden;
-        }
-        #hyperspace-bar {
-            width: 100%;
-            height: 100%;
-            background-color: #0af; /* Cyan */
-            transition: width 0.1s linear;
-        }
-        #game-over {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            padding: 30px;
-            border-radius: 10px;
-            text-align: center;
-            display: none; /* Hidden initially */
-            border: 2px solid #f00;
-        }
-        #game-over h2 {
-            margin-top: 0;
-            color: #f00;
-            font-size: 36px;
-        }
-        #game-over p {
-            font-size: 24px;
-            margin-bottom: 20px;
-        }
-        #restart-button {
-            padding: 10px 20px;
-            font-size: 18px;
-            cursor: pointer;
-            background-color: #44f;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            transition: background-color 0.2s;
-        }
-        #restart-button:hover {
-            background-color: #66f;
-        }
+    margin: 0;
+    padding: 0;
+    background-color: var(--primary-background-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Arial', sans-serif; /* Basic fallback font */
+    color: var(--primary-text-color);
+}
+canvas {
+    display: block;
+    background-color: var(--canvas-background-color);
+    border: 1px solid var(--ui-element-border-color); /* Changed from #333 */
+}
+#ui-container {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center; /* Vertically align items */
+    font-size: 20px;
+    pointer-events: none; /* Don't interfere with canvas */
+    text-shadow: 1px 1px 2px var(--text-shadow-color);
+}
+
+/* Ensure UI elements have pointer events if they are interactive */
+#ui-container > * {
+    pointer-events: auto;
+}
+
+#theme-toggle-button {
+    padding: 8px 15px;
+    font-size: 14px;
+    cursor: pointer;
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    border: 1px solid var(--ui-element-border-color);
+    border-radius: 5px;
+    transition: background-color 0.2s;
+    margin: 0 10px; /* Add some margin */
+}
+
+#theme-toggle-button:hover {
+    opacity: 0.8; /* General hover effect, can be more specific */
+}
+
+#weapon-status {
+    position: absolute;
+    bottom: 15px;
+    left: 15px;
+    background: var(--ui-element-background-color);
+    padding: 5px;
+    border-radius: 5px;
+    font-size: 14px;
+    border: 1px solid var(--ui-element-border-color);
+}
+#weapon-bar-container {
+    width: 100px;
+    height: 10px;
+    background-color: var(--bar-container-background-color);
+    border: 1px solid var(--ui-element-border-color);
+    border-radius: 3px;
+    margin-top: 3px;
+    overflow: hidden;
+}
+#weapon-bar {
+    width: 100%;
+    height: 100%;
+    background-color: var(--weapon-bar-background-color);
+    transition: width 0.1s linear; /* Smooth recharge vis */
+}
+#hyperspace-status {
+    position: absolute;
+    bottom: 15px;
+    right: 15px;
+    background: var(--ui-element-background-color);
+    padding: 5px;
+    border-radius: 5px;
+    font-size: 14px;
+    text-align: right;
+    border: 1px solid var(--ui-element-border-color);
+}
+#hyperspace-bar-container {
+     width: 100px;
+    height: 10px;
+    background-color: var(--bar-container-background-color);
+    border: 1px solid var(--ui-element-border-color);
+    border-radius: 3px;
+    margin-top: 3px;
+    overflow: hidden;
+}
+#hyperspace-bar {
+    width: 100%;
+    height: 100%;
+    background-color: var(--hyperspace-bar-background-color);
+    transition: width 0.1s linear;
+}
+#game-over {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--game-over-background-color);
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    display: none; /* Hidden initially */
+    border: 2px solid var(--game-over-border-color);
+    color: var(--primary-text-color); /* Ensure text inside game-over also uses theme color */
+}
+#game-over h2 {
+    margin-top: 0;
+    color: var(--game-over-text-color);
+    font-size: 36px;
+}
+#game-over p {
+    font-size: 24px;
+    margin-bottom: 20px;
+    /* Primary text color should be fine here if inherited from #game-over */
+}
+#restart-button {
+    padding: 10px 20px;
+    font-size: 18px;
+    cursor: pointer;
+    background-color: var(--button-background-color);
+    color: var(--button-text-color);
+    border: none; /* Or use var(--ui-element-border-color) if a border is desired */
+    border-radius: 5px;
+    transition: background-color 0.2s;
+}
+#restart-button:hover {
+    opacity: 0.8; /* General hover, or specify a different background for hover */
+}
