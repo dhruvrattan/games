@@ -43,7 +43,7 @@ body {
     align-items: center;
     height: 100vh;
     overflow: hidden;
-    font-family: 'Arial', sans-serif; /* Basic fallback font */
+    font-family: 'Verdana', 'Geneva', 'Tahoma', sans-serif; /* Updated font stack */
     color: var(--primary-text-color);
 }
 canvas {
@@ -77,12 +77,17 @@ canvas {
     color: var(--button-text-color);
     border: 1px solid var(--ui-element-border-color);
     border-radius: 5px;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, transform 0.1s; /* Added transform transition */
     margin: 0 10px; /* Add some margin */
 }
 
 #theme-toggle-button:hover {
-    opacity: 0.8; /* General hover effect, can be more specific */
+    background-color: color-mix(in srgb, var(--button-background-color) 80%, black); /* Darken button */
+}
+
+#theme-toggle-button:active {
+    transform: scale(0.96);
+    background-color: color-mix(in srgb, var(--button-background-color) 60%, black); /* Darken further */
 }
 
 #weapon-status {
@@ -167,8 +172,13 @@ canvas {
     color: var(--button-text-color);
     border: none; /* Or use var(--ui-element-border-color) if a border is desired */
     border-radius: 5px;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, transform 0.1s; /* Added transform transition */
 }
 #restart-button:hover {
-    opacity: 0.8; /* General hover, or specify a different background for hover */
+    background-color: color-mix(in srgb, var(--button-background-color) 80%, black); /* Darken button */
+}
+
+#restart-button:active {
+    transform: scale(0.96);
+    background-color: color-mix(in srgb, var(--button-background-color) 60%, black); /* Darken further */
 }

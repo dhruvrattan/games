@@ -15,9 +15,57 @@
     const restartButton = document.getElementById('restart-button');
     const themeToggleButton = document.getElementById('theme-toggle-button');
 
+    // --- Sprite Images ---
+    let shipSprite, asteroidSprite, laserSprite;
+    let imagesToLoad = 3; // Number of images to load
+    let imagesLoaded = 0;
+
+    function onImageLoad() {
+        imagesLoaded++;
+        if (imagesLoaded === imagesToLoad) {
+            // All images loaded, start the game
+            console.log("All sprites loaded. Starting game.");
+            requestAnimationFrame(gameLoop);
+        }
+    }
+
+    function loadSprites() {
+        shipSprite = new Image();
+        shipSprite.onload = onImageLoad;
+        shipSprite.src = 'sprites/ship.png';
+
+        asteroidSprite = new Image();
+        asteroidSprite.onload = onImageLoad;
+        asteroidSprite.src = 'sprites/asteroid.png';
+
+        laserSprite = new Image();
+        laserSprite.onload = onImageLoad;
+        laserSprite.src = 'sprites/laser.png';
+    }
+
+    // --- Sound Effects ---
+    const soundLaser = new Audio('sounds/laser.wav');
+    const soundExplosion = new Audio('sounds/explosion.wav');
+    const soundThrust = new Audio('sounds/thrust.wav');
+    soundThrust.loop = false; // Ensure thrust is not accidentally looped by default
+    const soundPowerup = new Audio('sounds/powerup.wav');
+    const soundGameover = new Audio('sounds/gameover.wav');
+    const soundShipHit = new Audio('sounds/ship_hit.wav');
+
+    function playSound(soundElement) {
+        // TODO: More robust error handling / readyState check if issues arise.
+        soundElement.currentTime = 0; // Rewind to start to allow rapid re-triggering
+        soundElement.play().catch(error => {
+            // Autoplay was prevented or other error
+            console.warn("Sound play failed:", error.name, error.message);
+            // This can happen if the user hasn't interacted with the page yet in some browsers.
+        });
+    }
+
     // --- Game Settings ---
     const GAME_CONFIG = {
-        STAR_COUNT: 200,
+        STAR_COUNT: 300, // Increased for better parallax
+        STAR_BASE_SPEED: 0.5, // Base speed for parallax layers
         SHIP_SIZE: 30,
         SHIP_ACCELERATION: 0.15,
         SHIP_FRICTION: 0.98,
@@ -90,9 +138,25 @@
         constructor() {
             this.x = random(0, canvasWidth);
             this.y = random(0, canvasHeight);
-            this.size = random(0.5, 2);
-            // Deeper stars (smaller size) move slower
-            this.speed = this.size * 0.2 + 0.1; // Base slow speed + size dependent speed
+            this.layer = Math.ceil(Math.random() * 3); // Assign layer 1, 2, or 3
+
+            switch (this.layer) {
+                case 1: // Distant
+                    this.size = random(0.5, 1.0);
+                    this.speed = GAME_CONFIG.STAR_BASE_SPEED * 0.25;
+                    break;
+                case 2: // Mid-ground
+                    this.size = random(1.0, 1.75);
+                    this.speed = GAME_CONFIG.STAR_BASE_SPEED * 0.5;
+                    break;
+                case 3: // Near
+                    this.size = random(1.75, 2.5);
+                    this.speed = GAME_CONFIG.STAR_BASE_SPEED * 1.0;
+                    break;
+                default: // Should not happen
+                    this.size = random(0.5, 2);
+                    this.speed = GAME_CONFIG.STAR_BASE_SPEED * 0.5;
+            }
         }
 
         update() {
@@ -105,10 +169,17 @@
 
         draw() {
             const isLightMode = document.body.classList.contains('light-mode');
+            // Opacity calculation: smaller stars (distant layers) are dimmer.
+            // For layer 1, size is ~0.5-1.0, opacity ~0.25-0.5 (dark) / ~0.33-0.66 (light)
+            // For layer 3, size is ~1.75-2.5, opacity ~0.87-1.25 (dark, capped at 1) / ~1.16-1.66 (light, capped at 1)
+            // This existing logic should work well with new sizes.
+            let opacity = isLightMode ? this.size / 1.5 : this.size / 2;
+            opacity = Math.min(1, Math.max(0.1, opacity)); // Clamp opacity for visibility
+
             if (isLightMode) {
-                ctx.fillStyle = `rgba(0, 0, 0, ${this.size / 1.5})`; // Darker stars for light mode, slightly more visible
+                ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
             } else {
-                ctx.fillStyle = `rgba(255, 255, 255, ${this.size / 2})`; // Original white stars for dark mode
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
             }
             ctx.fillRect(this.x, this.y, this.size, this.size);
         }
@@ -128,14 +199,20 @@
 
         draw() {
             ctx.save();
-            ctx.fillStyle = this.color;
+            const pulseAlpha = 0.6 + Math.sin(Date.now() / 250) * 0.4; // Pulsates between 0.2 and 1.0
+
+            // Base color is 'aqua' (rgb(0, 255, 255))
+            ctx.fillStyle = `rgba(0, 255, 255, ${pulseAlpha * 0.7})`; // Make fill slightly more transparent
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
             ctx.fill();
 
-            // Optional: Add a border or an inner glow for better visibility
             const isLightMode = document.body.classList.contains('light-mode');
-            ctx.strokeStyle = isLightMode ? '#555' : 'white'; // Darker border for light mode
+            // For stroke, use theme-aware color but also apply pulse.
+            // Light mode: 'rgb(85, 85, 85)' (darker gray for '#555')
+            // Dark mode: 'rgb(255, 255, 255)' (white)
+            const strokeBaseColor = isLightMode ? '85, 85, 85' : '255, 255, 255';
+            ctx.strokeStyle = `rgba(${strokeBaseColor}, ${pulseAlpha})`;
             ctx.lineWidth = 2;
             ctx.stroke();
             ctx.restore();
@@ -156,6 +233,7 @@
             this.vy = 0;
             this.angle = 0; // Always points up (0 radians)
             this.propulsionLevel = 0; // 0 to 1 for animation
+            this.isThrusting = false; // Track if thrust sound should be playing
             this.collisionRadius = this.width / 2.5; // Effective radius for collision
             this.invincible = false;
             this.invincibleTimer = 0;
@@ -168,11 +246,24 @@
 
         update(deltaTime) {
             let accelerating = false;
-            if (keys['ArrowUp'] || keys['w']) {
+            let justStartedThrusting = false; // To play sound only once per thrust initiation
+
+            if ((keys['ArrowUp'] || keys['w'])) {
+                if (!this.isThrusting) { // Check if thrust just started
+                    justStartedThrusting = true;
+                    this.isThrusting = true; // Mark that ship is now thrusting
+                }
                 this.vy -= GAME_CONFIG.SHIP_ACCELERATION;
                 accelerating = true;
                 this.propulsionLevel = Math.min(1, this.propulsionLevel + 0.1);
+            } else {
+                this.isThrusting = false; // Mark that ship is not thrusting if up/w is not pressed
             }
+
+            if (justStartedThrusting) {
+                playSound(soundThrust);
+            }
+
             if (keys['ArrowDown'] || keys['s']) {
                 this.vy += GAME_CONFIG.SHIP_ACCELERATION;
                 this.propulsionLevel = Math.min(1, this.propulsionLevel + 0.05); // Smaller backward thrust visual
@@ -241,31 +332,15 @@
             ctx.translate(this.x, this.y);
             ctx.rotate(this.angle); // Angle is always 0, but keep for potential future rotation
 
-            // Ship body (Retro-futuristic style)
-            ctx.beginPath();
-            ctx.moveTo(0, -this.height / 2); // Nose
-            ctx.lineTo(this.width / 2.5, this.height / 3); // Right wing back point
-            ctx.lineTo(this.width / 4, this.height / 2); // Right engine corner
-            ctx.lineTo(-this.width / 4, this.height / 2); // Left engine corner
-            ctx.lineTo(-this.width / 2.5, this.height / 3); // Left wing back point
-            ctx.closePath();
-
-            const isLightMode = document.body.classList.contains('light-mode');
-            ctx.fillStyle = isLightMode ? '#707070' : '#c0c0c0'; // Darker silver for light mode
-            ctx.strokeStyle = isLightMode ? '#404040' : '#ffffff'; // Darker outline for light mode
-            ctx.lineWidth = 1.5;
-            ctx.fill();
-            ctx.stroke();
-
-            // Cockpit
-            ctx.beginPath();
-            ctx.ellipse(0, -this.height / 4, this.width / 4, this.height / 6, 0, 0, Math.PI * 2);
-            ctx.fillStyle = isLightMode ? '#0077cc' : '#00aaff'; // Slightly more saturated blue for light mode
-            ctx.fill();
-            ctx.strokeStyle = isLightMode ? '#404040' : '#ffffff'; // Darker outline for light mode
-             ctx.lineWidth = 1;
-            ctx.stroke();
-
+            // Draw ship sprite
+            if (shipSprite && shipSprite.complete) {
+                ctx.drawImage(shipSprite, -this.width / 2, -this.height / 2, this.width, this.height);
+            } else {
+                // Fallback drawing if sprite is not loaded (optional, or draw nothing)
+                ctx.fillStyle = 'grey';
+                ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+                console.warn("Ship sprite not loaded or not ready, drawing fallback.");
+            }
 
             // Propulsion animation
             if (this.propulsionLevel > 0) {
@@ -296,11 +371,18 @@
             // --- Draw Shield if Active (after other ship components) ---
             if (this.shieldActive) {
                 const shieldRadius = this.height / 2 + 10; // Make it large enough to cover the ship
+                const shieldPulseAlpha = 0.2 + Math.sin(Date.now() / 200) * 0.2; // Pulsates between 0.0 and 0.4
+
                 ctx.beginPath();
-                ctx.arc(0, 0, shieldRadius, 0, Math.PI * 2); // x=0, y=0 because we've translated context
-                ctx.fillStyle = 'rgba(0, 170, 255, 0.3)'; // Semi-transparent blue
+                ctx.arc(0, 0, shieldRadius, 0, Math.PI * 2);
+
+                // Base fill color: 'rgba(0, 170, 255, alpha)'
+                ctx.fillStyle = `rgba(0, 170, 255, ${shieldPulseAlpha})`;
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(0, 200, 255, 0.7)'; // Brighter blue border
+
+                // Base stroke color: 'rgba(0, 200, 255, alpha)'
+                // Make stroke slightly more opaque than fill
+                ctx.strokeStyle = `rgba(0, 200, 255, ${shieldPulseAlpha + 0.15})`;
                 ctx.lineWidth = 2;
                 ctx.stroke();
             }
@@ -315,6 +397,7 @@
                 lasers.push(new Laser(this.x - this.width/5, this.y - this.height / 2));
                 lasers.push(new Laser(this.x + this.width/5, this.y - this.height / 2));
                 lastLaserTime = now;
+                playSound(soundLaser);
                 updateWeaponStatus(); // Update UI immediately
             }
         }
@@ -322,6 +405,7 @@
         takeHit() {
             if (!this.invincible) {
                 lives--;
+                playSound(soundShipHit);
                 updateUI();
                 if (lives <= 0) {
                     gameOver();
@@ -385,15 +469,19 @@
         }
 
         draw() {
-            // Glowing effect
-            ctx.shadowColor = this.color;
-            ctx.shadowBlur = 8;
-
-            ctx.fillStyle = this.color;
-            ctx.fillRect(this.x - this.width / 2, this.y, this.width, this.height);
-
-            // Reset shadow
-            ctx.shadowBlur = 0;
+            // Draw laser sprite
+            if (laserSprite && laserSprite.complete) {
+                // The laser's (x,y) is its top-center.
+                // drawImage draws from the top-left corner of the image.
+                // So we offset x by -this.width / 2.
+                // The y coordinate in the constructor is already the top of the laser.
+                ctx.drawImage(laserSprite, this.x - this.width / 2, this.y, this.width, this.height);
+            } else {
+                // Fallback drawing
+                ctx.fillStyle = this.color || '#00ffff'; // Use defined color or default
+                ctx.fillRect(this.x - this.width / 2, this.y, this.width, this.height);
+                console.warn("Laser sprite not loaded or not ready, drawing fallback rectangle.");
+            }
         }
     }
 
@@ -449,19 +537,18 @@
             ctx.translate(this.x, this.y);
             ctx.rotate(this.rotation);
 
-            ctx.beginPath();
-            ctx.moveTo(this.vertices[0].x, this.vertices[0].y);
-            for (let i = 1; i < this.vertices.length; i++) {
-                ctx.lineTo(this.vertices[i].x, this.vertices[i].y);
+            // Draw asteroid sprite
+            if (asteroidSprite && asteroidSprite.complete) {
+                // Ensure drawing is centered correctly; this.size is diameter
+                ctx.drawImage(asteroidSprite, -this.radius, -this.radius, this.size, this.size);
+            } else {
+                // Fallback drawing
+                ctx.fillStyle = 'darkgrey';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                console.warn("Asteroid sprite not loaded or not ready, drawing fallback circle.");
             }
-            ctx.closePath();
-
-            const isLightMode = document.body.classList.contains('light-mode');
-            ctx.fillStyle = isLightMode ? '#606060' : '#a0a0a0'; // Darker asteroid body for light mode
-            ctx.strokeStyle = isLightMode ? '#404040' : '#cccccc'; // Darker asteroid outline for light mode
-            ctx.lineWidth = 1.5;
-            ctx.fill();
-            ctx.stroke();
 
             ctx.restore();
         }
@@ -685,6 +772,7 @@
                     const fragment = fragments[k];
                      if (distance(laser.x, laser.y, fragment.x, fragment.y) < fragment.radius + laser.width) {
                         fragments.splice(k, 1); // Remove fragment
+                        playSound(soundExplosion); // Play sound for fragment destruction
                         score += fragment.pointsValue;
                         updateUI();
                         laserHit = true;
@@ -729,13 +817,15 @@
                 if (distance(ship.x, ship.y, fragment.x, fragment.y) < fragment.radius + ship.collisionRadius) {
                     if (ship.shieldActive) {
                         fragments.splice(k, 1); // Destroy fragment, shield absorbs hit
+                        playSound(soundExplosion); // Play sound for fragment destruction by shield
                         // console.log("Shield absorbed fragment hit!"); // For debugging
                         break; // Process one collision
                     } else {
                         // Shield is not active, proceed with normal damage mechanism
                         if (!ship.invincible) { // This check is important
-                            ship.takeHit();
+                            ship.takeHit(); // Plays its own shipHit sound
                             fragments.splice(k, 1);
+                            playSound(soundExplosion); // Play sound for fragment destruction by ship
                             if (isGameOver) return;
                             break;
                         }
@@ -753,8 +843,7 @@
                     ship.shieldActive = true;
                     ship.shieldTimer = GAME_CONFIG.SHIELD_DURATION;
                     shieldPowerUps.splice(i, 1); // Remove the collected power-up
-
-                    // Optional: Add sound effect for power-up collection here
+                    playSound(soundPowerup);
                     // console.log("Shield Activated!"); // For debugging
 
                     break; // Ship collects one power-up at a time
@@ -765,6 +854,7 @@
 
     function destroyAsteroid(asteroid, index) {
         score += asteroid.pointsValue;
+        playSound(soundExplosion);
         updateUI();
 
         // Create fragments
@@ -791,7 +881,8 @@
              weaponBarElement.style.width = '100%';
          } else {
              const cooldownProgress = Math.min(1, timeSinceLastShot / GAME_CONFIG.LASER_COOLDOWN);
-             weaponStatusElement.textContent = "Weapon: Charging ";
+             const percentage = Math.floor(cooldownProgress * 100);
+             weaponStatusElement.textContent = `Weapon: Charging (${percentage}%) `;
              weaponBarElement.style.width = `${cooldownProgress * 100}%`;
          }
      }
@@ -816,13 +907,15 @@
                  statusText += "Ready ";
                  barPercentage = 100;
              } else { // Still cooling down from a previous jump (and has charges)
-                 statusText += "Charging ";
-                 barPercentage = Math.min(100, (timeSinceLastJump / GAME_CONFIG.HYPERSPACE_COOLDOWN) * 100);
+                 const chargePercentage = Math.floor(Math.min(100, (timeSinceLastJump / GAME_CONFIG.HYPERSPACE_COOLDOWN) * 100));
+                 statusText += `Charging (${chargePercentage}%) `;
+                 barPercentage = chargePercentage;
              }
          } else { // 0 charges left
              if (!hyperspaceReady && timeSinceLastJump < GAME_CONFIG.HYPERSPACE_COOLDOWN) {
-                 statusText += "Charging "; // Visually show cooldown of last jump
-                  barPercentage = Math.min(100, (timeSinceLastJump / GAME_CONFIG.HYPERSPACE_COOLDOWN) * 100);
+                 const chargePercentage = Math.floor(Math.min(100, (timeSinceLastJump / GAME_CONFIG.HYPERSPACE_COOLDOWN) * 100));
+                 statusText += `Charging (${chargePercentage}%) `; // Visually show cooldown of last jump
+                 barPercentage = chargePercentage;
              } else {
                  statusText += "Depleted ";
                   barPercentage = 0;
@@ -840,8 +933,11 @@
         isGameOver = true;
         finalScoreElement.textContent = `Final Score: ${score}`;
         gameOverElement.style.display = 'block';
-         ship.vx = 0;
-         ship.vy = 0;
+        playSound(soundGameover);
+        if (ship) { // Ensure ship exists before trying to stop its movement
+             ship.vx = 0;
+             ship.vy = 0;
+        }
     }
 
     function restartGame() {
@@ -874,6 +970,7 @@
     resizeCanvas(); 
     initGame();     
     // requestAnimationFrame(gameLoop); // Will be called after theme setup
+    loadSprites(); // Load sprites before starting the game loop via onImageLoad
 
     // --- Theme Switching Logic ---
     function applyTheme(themeName) {
@@ -908,6 +1005,6 @@
         applyTheme('dark'); // Default to dark mode
     }
 
-    requestAnimationFrame(gameLoop); // Start the game loop after theme is set
+    // requestAnimationFrame(gameLoop); // This line is now removed, game starts after images load
 
 })();
