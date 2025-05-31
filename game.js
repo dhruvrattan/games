@@ -13,6 +13,7 @@
     const gameOverElement = document.getElementById('game-over');
     const finalScoreElement = document.getElementById('final-score');
     const restartButton = document.getElementById('restart-button');
+    const themeToggleButton = document.getElementById('theme-toggle-button');
 
     // --- Game Settings ---
     const GAME_CONFIG = {
@@ -103,7 +104,12 @@
         }
 
         draw() {
-            ctx.fillStyle = `rgba(255, 255, 255, ${this.size / 2})`; // Fainter for smaller/distant stars
+            const isLightMode = document.body.classList.contains('light-mode');
+            if (isLightMode) {
+                ctx.fillStyle = `rgba(0, 0, 0, ${this.size / 1.5})`; // Darker stars for light mode, slightly more visible
+            } else {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.size / 2})`; // Original white stars for dark mode
+            }
             ctx.fillRect(this.x, this.y, this.size, this.size);
         }
     }
@@ -128,7 +134,8 @@
             ctx.fill();
 
             // Optional: Add a border or an inner glow for better visibility
-            ctx.strokeStyle = 'white';
+            const isLightMode = document.body.classList.contains('light-mode');
+            ctx.strokeStyle = isLightMode ? '#555' : 'white'; // Darker border for light mode
             ctx.lineWidth = 2;
             ctx.stroke();
             ctx.restore();
@@ -243,8 +250,9 @@
             ctx.lineTo(-this.width / 2.5, this.height / 3); // Left wing back point
             ctx.closePath();
 
-            ctx.fillStyle = '#c0c0c0'; // Silver
-            ctx.strokeStyle = '#ffffff'; // White outline
+            const isLightMode = document.body.classList.contains('light-mode');
+            ctx.fillStyle = isLightMode ? '#707070' : '#c0c0c0'; // Darker silver for light mode
+            ctx.strokeStyle = isLightMode ? '#404040' : '#ffffff'; // Darker outline for light mode
             ctx.lineWidth = 1.5;
             ctx.fill();
             ctx.stroke();
@@ -252,9 +260,9 @@
             // Cockpit
             ctx.beginPath();
             ctx.ellipse(0, -this.height / 4, this.width / 4, this.height / 6, 0, 0, Math.PI * 2);
-            ctx.fillStyle = '#00aaff'; // Light blue
+            ctx.fillStyle = isLightMode ? '#0077cc' : '#00aaff'; // Slightly more saturated blue for light mode
             ctx.fill();
-            ctx.strokeStyle = '#ffffff';
+            ctx.strokeStyle = isLightMode ? '#404040' : '#ffffff'; // Darker outline for light mode
              ctx.lineWidth = 1;
             ctx.stroke();
 
@@ -448,8 +456,9 @@
             }
             ctx.closePath();
 
-            ctx.fillStyle = '#a0a0a0';
-            ctx.strokeStyle = '#cccccc';
+            const isLightMode = document.body.classList.contains('light-mode');
+            ctx.fillStyle = isLightMode ? '#606060' : '#a0a0a0'; // Darker asteroid body for light mode
+            ctx.strokeStyle = isLightMode ? '#404040' : '#cccccc'; // Darker asteroid outline for light mode
             ctx.lineWidth = 1.5;
             ctx.fill();
             ctx.stroke();
@@ -864,6 +873,41 @@
     // --- Initial Setup ---
     resizeCanvas(); 
     initGame();     
-    requestAnimationFrame(gameLoop);
+    // requestAnimationFrame(gameLoop); // Will be called after theme setup
+
+    // --- Theme Switching Logic ---
+    function applyTheme(themeName) {
+        if (themeName === 'light') {
+            document.body.classList.add('light-mode');
+            if (themeToggleButton) themeToggleButton.textContent = "Switch to Dark Mode";
+        } else { // 'dark' or any other case
+            document.body.classList.remove('light-mode');
+            if (themeToggleButton) themeToggleButton.textContent = "Switch to Light Mode";
+        }
+    }
+
+    function toggleTheme() {
+        if (document.body.classList.contains('light-mode')) {
+            applyTheme('dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            applyTheme('light');
+            localStorage.setItem('theme', 'light');
+        }
+    }
+
+    if (themeToggleButton) {
+        themeToggleButton.addEventListener('click', toggleTheme);
+    }
+
+    // Load saved theme or default
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        applyTheme(savedTheme);
+    } else {
+        applyTheme('dark'); // Default to dark mode
+    }
+
+    requestAnimationFrame(gameLoop); // Start the game loop after theme is set
 
 })();
